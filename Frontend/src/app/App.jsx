@@ -15,6 +15,15 @@ const App = () => {
   const ydoc = useMemo(() => new Y.Doc(), []);
   const ytext = useMemo(() => ydoc.getText("monaco"), [ydoc]);
 
+  const handleMount = (editor) => {
+    editorRef.current = editor;
+    new MonacoBinding(
+      ytext,
+      editorRef.current.getModel(),
+      new Set([editorRef.current]),
+    );
+  };
+
   const handleJoin = (e) => {
     e.preventDefault();
     setUserName(e.target.username.value);
@@ -22,7 +31,7 @@ const App = () => {
   };
 
   useEffect(() => {
-    if (userName && editorRef.current) {
+    if (userName) {
       const provider = new SocketIOProvider(
         "http://localhost:3000",
         "monaco",
@@ -32,25 +41,36 @@ const App = () => {
         },
       );
 
-      provider.awareness.setLocalStateField("user", { userName });
+      provider.awareness.setLocalStateField("user", { username: userName });
+
+      const states = Array.from(provider.awareness.getStates().values());
+      setUsers(
+        states
+          .filter((state) => state.user && state.user.username)
+          .map((state) => state.user),
+      );
 
       provider.awareness.on("change", () => {
         const states = Array.from(provider.awareness.getStates().values());
         setUsers(
           states
-            .map((state) => state.user)
-            .filter((user) => Boolean(user.username)),
+            .filter((state) => state.user && state.user.username)
+            .map((state) => state.user),
         );
       });
 
-      const monacoBinding = new MonacoBinding(
-        ytext,
-        editorRef.current.getModel(),
-        new Set([editorRef.current]),
-        provider.awareness,
-      );
+      const handleBeforeUnload = () => {
+        provider.awareness.setLocalStateField("user", null);
+      };
+
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      return () => {
+        provider.disconnect();
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      };
     }
-  }, [editorRef.current, userName]);
+  }, [userName]);
 
   if (!userName) {
     return (
@@ -71,13 +91,23 @@ const App = () => {
     );
   }
 
-  const handleMount = (editor) => {
-    editorRef.current = editor;
-  };
-
   return (
     <main className="h-screen w-full bg-neutral-950 text-amber-50 flex gap-4 p-4">
-      <aside className="h-full w-1/4 bg-rose-400 rounded-lg"></aside>
+      <aside className="h-full w-1/4 bg-rose-400 rounded-lg">
+        <h2 className="text-2xl font-bold p-4 border-b border-gray-300">
+          Users
+        </h2>
+        <ul className="p-4">
+          {users.map((user, index) => (
+            <li
+              key={index}
+              className="p-2 bg-neutral-800 text-white rounded mb-2"
+            >
+              {user.username}
+            </li>
+          ))}
+        </ul>
+      </aside>
 
       <section className="w-3/4 h-full bg-rose-500 rounded-lg overflow-hidden">
         <Editor
