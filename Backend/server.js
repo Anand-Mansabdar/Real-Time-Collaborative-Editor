@@ -4,8 +4,9 @@ import { Server } from "socket.io";
 import { YSocketIO } from "y-socket.io/dist/server";
 
 const app = express();
-const httpServer = createServer(app);
+app.use(express.static("public"));
 
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
@@ -17,12 +18,6 @@ const ySocketIO = new YSocketIO(io);
 ySocketIO.initialize();
 
 // Health Check Routes - To check if server is functioning properly
-app.get("/", (req, res) => {
-  return res.status(200).json({
-    message: "Hello World",
-    success: true,
-  });
-});
 
 app.get("/health", (req, res) => {
   return res.status(200).json({
